@@ -138,7 +138,6 @@ async function loadProjects() {
     return;
   }
   
-  // Load Projects grid
   const grid = document.getElementById('projectGrid');
   grid.innerHTML = data.length === 0 ? '<p>No projects yet.</p>' : data.map(p => `
     <div class="card">
@@ -155,7 +154,6 @@ async function loadProjects() {
     </div>
   `).join('');
 
-  // Load Ledger table
   const tbody = document.querySelector('#ledgerTable tbody');
   tbody.innerHTML = data.length === 0 ? '<tr><td colspan="8">No entries yet.</td></tr>' : data.map(p => `
     <tr>
@@ -180,12 +178,12 @@ document.getElementById('projectForm').addEventListener('submit', async (e) => {
   const file = formData.get('file');
   if (file && file.size > 0) {
     const fileName = `${Date.now()}-${file.name}`;
-    const { data: uploadData, error: uploadError } = await supabase.storage.from('proofs').upload(fileName, file);
+    const { data: uploadData, error: uploadError } = await supabase.storage.from('proofs2').upload(fileName, file);
     if(uploadError) {
       alert('Upload error: ' + uploadError.message);
       return;
     }
-    fileUrl = `${SUPABASE_URL}/storage/v1/object/public/proofs/${fileName}`;
+    fileUrl = `${SUPABASE_URL}/storage/v1/object/public/proofs2/${fileName}`;
   }
 
   const { error } = await supabase.from('projects').insert([{
