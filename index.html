@@ -39,7 +39,7 @@
   .alert.success { background: #e7f7ed; color: #1e5f3a; display: block; }
   .section { display: none; }
   .section.active { display: block; }
-  @media(max-width: 768px) { .form-grid { grid-template-columns: 1fr; } }
+  @media(max-width: 768px) { .form-grid { grid-template-columns: 1fr; }
 </style>
 </head>
 <body>
@@ -121,93 +121,105 @@ const SUPABASE_URL = 'https://xshcbofzqaldeowwhkcxg.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_NWknxwxHYcmxE7-C514Vhw_zleVc3Fk';
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-function showSection(id) {
+function showSection(id, event) {
   document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
   document.querySelectorAll('.nav-link').forEach(n => n.classList.remove('active'));
   document.getElementById(id).classList.add('active');
-  event.target.classList.add('active');
+  
+  // Only set active nav if we have the event
+  if (event && event.target) {
+    event.target.classList.add('active');
+  } else {
+    document.querySelector(`a[onclick*="showSection('${id}')"]`)?.classList.add('active');
+  }
+  
   if(id === 'projects' || id === 'ledger') loadProjects();
 }
 window.showSection = showSection;
 
 async function loadProjects() {
-  const { data, error } = await supabase.from('projects').select('*').order('created_at', { ascending: false });
-  if(error) {
-    console.error(error);
-    document.getElementById('projectGrid').innerHTML = 'Error loading projects';
-    return;
-  }
-  
-  const grid = document.getElementById('projectGrid');
-  grid.innerHTML = data.length === 0 ? '<p>No projects yet.</p>' : data.map(p => `
-    <div class="card">
-      <img src="${p.file_url || 'https://via.placeholder.com/400x200'}" alt="Project">
-      <div class="card-body">
-        <span class="badge">${p.type}</span> 
-        <span class="verified">${p.status === 'verified' ? '✓ Verified' : 'Pending'}</span>
-        <h3>${p.school} - ${p.province}</h3>
-        <p>${p.description}</p>
-        <div class="stats">
-          <span>R${p.amount}</span><span>${p.donor}</span><span>${new Date(p.created_at).toLocaleDateString()}</span>
+  try {
+    const { data, error } = await supabase.from('projects').select('*').order('created_at', { ascending: false });
+    if(error) throw error;
+    
+    const grid = document.getElementById('projectGrid');
+    grid.innerHTML = data.length === 0 ? '<p>No projects yet.</p>' : data.map(p => `
+      <div class="card">
+        <img src="${p.file_url || 'https://via.placeholder.com/400x200'}" alt="Project">
+        <div class="card-body">
+          <span class="badge">${p.type}</span> 
+          <span class="verified">${p.status === 'verified' ? '✓ Verified' : 'Pending'}</span>
+          <h3>${p.school} - ${p.province}</h3>
+          <p>${p.description}</p>
+          <div class="stats">
+            <span>R${p.amount}</span><span>${p.donor}</span><span>${new Date(p.created_at).toLocaleDateString()}</span>
+          </div>
         </div>
       </div>
-    </div>
-  `).join('');
+    `).join('');
 
-  const tbody = document.querySelector('#ledgerTable tbody');
-  tbody.innerHTML = data.length === 0 ? '<tr><td colspan="8">No entries yet.</td></tr>' : data.map(p => `
-    <tr>
-      <td>${new Date(p.created_at).toLocaleDateString()}</td>
-      <td>${p.school}</td>
-      <td>${p.province}</td>
-      <td>${p.type}</td>
-      <td>${p.donor}</td>
-      <td>R${p.amount}</td>
-      <td><span class="status ${p.status}">${p.status}</span></td>
-      <td>${p.file_url ? `<a href="${p.file_url}" target="_blank">View</a>` : 'None'}</td>
-    </tr>
-  `).join('');
+    const tbody = document.querySelector('#ledgerTable tbody');
+    tbody.innerHTML = data.length === 0 ? '<tr><td colspan="8">No entries yet.</td></tr>' : data.map(p => `
+      <tr>
+        <td>${new Date(p.created_at).toLocaleDateString()}</td>
+        <td>${p.school}</td>
+        <td>${p.province}</td>
+        <td>${p.type}</td>
+        <td>${p.donor}</td>
+        <td>R${p.amount}</td>
+        <td><span class="status ${p.status}">${p.status}</span></td>
+        <td>${p.file_url ? `<a href="${p.file_url}" target="_blank">View</a>` : 'None'}</td>
+      </tr>
+    `).join('');
+  } catch (err) {
+    document.getElementById('projectGrid').innerHTML = 'Error loading projects';
+    console.error(err);
+  }
 }
 
 document.getElementById('projectForm').addEventListener('submit', async (e) => {
   e.preventDefault();
-  const form = e.target;
-  const formData = new FormData(form);
-  
-  let fileUrl = null;
-  const file = formData.get('file');
-  if (file && file.size > 0) {
-    const fileName = `${Date.now()}-${file.name}`;
-    const { data: uploadData, error: uploadError } = await supabase.storage.from('proofs2').upload(fileName, file);
-    if(uploadError) {
-      alert('Upload error: ' + uploadError.message);
-      return;
+  try {
+    const form = e.target;
+    const formData = new FormData(form);
+    
+    let fileUrl = null;
+    const file = formData.get('file');
+    if (file && file.size > 0) {
+      const fileName = `${Date.now()}-${file.name}`;
+      const { error: uploadError } = await supabase.storage.from('proofs2').upload(fileName, file);
+      if(uploadError) {
+        alert('Upload error: ' + uploadError.message);
+        return;
+      }
+      fileUrl = `${SUPABASE_URL}/storage/v1/object/public/proofs2/${fileName}`;
     }
-    fileUrl = `${SUPABASE_URL}/storage/v1/object/public/proofs2/${fileName}`;
-  }
 
-  const { error } = await supabase.from('projects').insert([{
-    donor: formData.get('donor'),
-    email: formData.get('email'),
-    school: formData.get('school'),
-    province: formData.get('province'),
-    type: formData.get('type'),
-    amount: formData.get('amount'),
-    description: formData.get('description'),
-    file_url: fileUrl,
-    status: 'pending'
-  }]);
+    const { error } = await supabase.from('projects').insert([{
+      donor: formData.get('donor'),
+      email: formData.get('email'),
+      school: formData.get('school'),
+      province: formData.get('province'),
+      type: formData.get('type'),
+      amount: formData.get('amount'),
+      description: formData.get('description'),
+      file_url: fileUrl,
+      status: 'pending'
+    }]);
 
-  if (!error) {
-    document.getElementById('successAlert').style.display = 'block';
-    form.reset();
-    loadProjects();
-    setTimeout(() => {
-      document.getElementById('successAlert').style.display = 'none';
-      showSection('ledger');
-    }, 2000);
-  } else {
-    alert('DB error: ' + error.message);
+    if (!error) {
+      document.getElementById('successAlert').style.display = 'block';
+      form.reset();
+      loadProjects();
+      setTimeout(() => {
+        document.getElementById('successAlert').style.display = 'none';
+        showSection('ledger');
+      }, 2000);
+    } else {
+      alert('DB error: ' + error.message);
+    }
+  } catch (err) {
+    alert('JS error: ' + err.message);
   }
 });
 
