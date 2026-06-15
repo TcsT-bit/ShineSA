@@ -117,8 +117,8 @@
 <script type="module">
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/+esm'
 
-const SUPABASE_URL = https://xshcbofzqaldeowwhkcxg.supabase.co ;
-const SUPABASE_ANON_KEY = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhzaGNib2Z6cWFsZGV3d2hrY3hnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE0NDc3ODUsImV4cCI6MjA5NzAyMzc4NX0.kbG_pYnYzqDZXiQVyv4IUwBHDl5lr58hQM2Y334KTZ4 ;
+const SUPABASE_URL = 'https://xshcbofzqaldeowwhkcxg.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhzaGNib2Z6cWFsZGV3d2hrY3hnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE0NDc3ODUsImV4cCI6MjA5NzAyMzc4NX0.kbG_pYnYzqDZXiQVyv4IUwBHDl5lr58hQM2Y334KTZ4';
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 function showSection(id) {
@@ -126,15 +126,21 @@ function showSection(id) {
   document.querySelectorAll('.nav-link').forEach(n => n.classList.remove('active'));
   document.getElementById(id).classList.add('active');
   event.target.classList.add('active');
+  if(id === 'projects' || id === 'ledger') loadProjects();
 }
 window.showSection = showSection;
 
 async function loadProjects() {
-  const { data } = await supabase.from('projects').select('*').order('created_at', { ascending: false });
+  const { data, error } = await supabase.from('projects').select('*').order('created_at', { ascending: false });
+  if(error) {
+    console.error(error);
+    document.getElementById('projectGrid').innerHTML = 'Error loading projects';
+    return;
+  }
   
   // Load Projects grid
   const grid = document.getElementById('projectGrid');
-  grid.innerHTML = data.map(p => `
+  grid.innerHTML = data.length === 0 ? '<p>No projects yet.</p>' : data.map(p => `
     <div class="card">
       <img src="${p.file_url || 'https://via.placeholder.com/400x200'}" alt="Project">
       <div class="card-body">
@@ -151,7 +157,7 @@ async function loadProjects() {
 
   // Load Ledger table
   const tbody = document.querySelector('#ledgerTable tbody');
-  tbody.innerHTML = data.map(p => `
+  tbody.innerHTML = data.length === 0 ? '<tr><td colspan="8">No entries yet.</td></tr>' : data.map(p => `
     <tr>
       <td>${new Date(p.created_at).toLocaleDateString()}</td>
       <td>${p.school}</td>
@@ -174,7 +180,11 @@ document.getElementById('projectForm').addEventListener('submit', async (e) => {
   const file = formData.get('file');
   if (file && file.size > 0) {
     const fileName = `${Date.now()}-${file.name}`;
-    const { data: uploadData } = await supabase.storage.from('proofs').upload(fileName, file);
+    const { data: uploadData, error: uploadError } = await supabase.storage.from('proofs').upload(fileName, file);
+    if(uploadError) {
+      alert('Upload error: ' + uploadError.message);
+      return;
+    }
     fileUrl = `${SUPABASE_URL}/storage/v1/object/public/proofs/${fileName}`;
   }
 
@@ -207,4 +217,4 @@ loadProjects();
 </script>
 
 </body>
-  </html>
+</html>
